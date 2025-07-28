@@ -1,0 +1,177 @@
+## Guide: How to Upload an Excel File, Analyze Data, and Create Graphs in R
+
+# This is a simple, step-by-step guide for beginners on how to upload an Excel file, perform basic analysis, and create graphs in R.
+
+## 1. Install and Loading Packages
+
+# Install if needed
+install.packages(c("readxl", "dplyr", "ggplot2"))
+
+# Load libraries
+library(readxl)
+library(dplyr)
+library(ggplot2)
+
+
+## 2. Import Your Excel File, Check Head And Column Names
+
+# Load the dataset (update the path as needed)
+df <- read_excel("C:/Users/A.Devasahayam/Documents/GitHub/Clinical_Data.xlsx")
+
+# Check first few rows
+head(df)
+
+# See column names
+colnames(df)
+
+
+## 3. Inspect and Clean Your Data
+
+# Print column names before renaming
+cat("Before renaming:\n")
+print(colnames(df))
+
+# Clean and rename
+df <- df %>%
+  rename(
+    VO2_Pre = VO2_mL_Kg_Min_1,
+    VO2_Post = VO2_mL_Kg_Min_2
+  ) %>%
+  filter(!is.na(VO2_Pre), !is.na(VO2_Post))
+
+# Print column names after renaming
+cat("\nAfter renaming:\n")
+print(colnames(df))
+
+
+## 4. Descriptive Statistics
+
+# Summary of continuous variables
+summary(df %>% select(Age, YearsOfEducation, VO2_Pre, VO2_Post, RestHR, MaxHR))
+
+# Summary grouped by Sex
+df %>%
+  group_by(Sex) %>%
+  summarise(
+    N = n(),
+    Mean_Age = mean(Age, na.rm = TRUE),
+    Mean_VO2_Pre = mean(VO2_Pre, na.rm = TRUE),
+    Mean_VO2_Post = mean(VO2_Post, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+
+## 5. Group Comparisons
+
+# Create change variable
+df <- df %>% mutate(VO2_Change = VO2_Post - VO2_Pre)
+
+# Compare VO2 change by Sex
+df %>%
+  group_by(Sex) %>%
+  summarise(
+    Mean_Change = mean(VO2_Change),
+    SD_Change = sd(VO2_Change),
+    .groups = "drop"
+  )
+
+
+## 6. Paired Analysis
+
+# Paired t-test to test if VO2 changed significantly from Pre to Post within the same participants
+t.test(df$VO2_Post, df$VO2_Pre, paired = TRUE)
+
+# Independent t-test to compare VO2 change between sexes 
+t.test(VO2_Change ~ Sex, data = df)
+
+
+## 7. Visualizations
+
+# Histogram of Age
+ggplot(df, aes(x = Age)) +
+  geom_histogram(binwidth = 5, fill = "#69b3a2", color = "black") +
+  labs(title = "Age Distribution", x = "Age", y = "Count") +
+  theme_minimal()
+
+# Scatter plot: VO2 Pre vs Post
+ggplot(df, aes(x = VO2_Pre, y = VO2_Post)) +
+  geom_point(alpha = 0.7) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "VO2 Pre vs Post", x = "VO2 Pre", y = "VO2 Post") +
+  theme_minimal()
+
+# Boxplot: VO2 change by sex
+ggplot(df, aes(x = factor(Sex), y = VO2_Change, fill = factor(Sex))) +
+  geom_boxplot() +
+  scale_x_discrete(labels = c("Male", "Female")) +
+  labs(title = "VO2 Change by Sex", x = "Sex", y = "Change in VO2") +
+  theme_minimal()
+
+
+## 8. Correlation
+
+# Pearson correlation between VO2_Pre and VO2_Post
+cor.test(df$VO2_Pre, df$VO2_Post, method = "pearson")
+
+## Correlation Matrix for Multiple Variables
+
+# Select numeric columns for correlation
+numeric_vars <- df %>% 
+  select(Age, YearsOfEducation, VO2_Pre, VO2_Post, RestHR, MaxHR, VO2_Change)
+
+# Compute correlation matrix
+cor_matrix <- cor(numeric_vars, use = "complete.obs", method = "pearson")
+print(cor_matrix)
+
+# Visual heatmap of the correlation matrix
+
+install.packages("corrplot")
+library(corrplot)
+
+corrplot(cor_matrix, method = "color", type = "upper", tl.col = "black", tl.srt = 45)
+
+
+# Checking Assumptions for Pearson Correlation
+# Histogram example to check distribution
+ggplot(df, aes(x = VO2_Change)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "black") +
+  labs(title = "Distribution of VO2 Change")
+
+# If data are not normally distributed, consider Spearman correlation instead
+cor.test(df$VO2_Pre, df$VO2_Post, method = "spearman")
+
+## 9. Regression
+
+# Linear Regression
+model <- lm(VO2_Post ~ VO2_Pre + Age, data = df)
+summary(model)
+
+# Logistic Regression
+# Convert Sex to factor with labels
+df$Sex <- factor(df$Sex, levels = c(1, 2), labels = c("Male", "Female"))
+
+# Fit model predicting Sex from VO2_Pre and Age
+logistic_model <- glm(Sex ~ VO2_Pre + Age, data = df, family = binomial)
+
+# View model summary
+summary(logistic_model)
+
+# Odds ratios
+exp(coef(logistic_model))
+
+# Model Diagnostics and Prediction
+df$predicted_prob <- predict(logistic_model, type = "response")
+head(df$predicted_prob)
+
+# Confusion matrix with a 0.5 cutoff
+df$predicted_class <- ifelse(df$predicted_prob > 0.5, "Female", "Male")
+table(Predicted = df$predicted_class, Actual = df$Sex)
+
+
+## 10. Now you know how to:
+
+# Import data from an Excel file
+# Perform descriptive statistics
+# Visualize your data with histograms, boxplots, and scatter plots
+# Perform simple statistical tests
+# Export cleaned data back to CSV
